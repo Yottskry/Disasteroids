@@ -1,0 +1,1111 @@
+/*
+* Disasteroids - Copyright 2024 Stephen Branley.
+*
+* This file is part of Disasteroids.
+*
+* Disasteroids is free software: you can redistribute it and/or modify
+* it under the terms of the GNU General Public License as published by
+* the Free Software Foundation, either version 3 of the License,
+* or (at your option) any later version.
+*
+* Disasteroids is distributed in the hope that it will be useful, but
+* WITHOUT ANY WARRANTY; without even the implied warranty of
+* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+* See the GNU General Public License for more details.
+*
+* You should have received a copy of the GNU General Public License
+* along with Foobar. If not, see <https://www.gnu.org/licenses/>.
+*
+*/
+
+#include "resourcefactory.h"
+#include "arena.h"
+#include "ship.h"
+#include "app.h"
+#include "text.h"
+#include "intro.h"
+#include "scores.h"
+#include "config.h"
+#include "menu.h"
+//#include "levels.h"
+#include "vector.h"
+#include "resources.h"
+//#include "save.h"
+#include "rock.h"
+#include <time.h>
+#include <stdio.h>
+#include <SDL2/SDL.h>
+#include <SDL2/SDL_ttf.h>
+#include <stdbool.h>
+
+#define OPT1 "Ball angle is determined by segment of bat hit"
+#define OPT2 "Bat speed and direction influences ball spin and angle"
+#define DON1 "This game is a labour of love. All programming, graphics, music, and sound effects were produced by me."
+#define DON2 "If you enjoy playing it, please consider making a small donation by buying me a coffee through the link below."
+#define DON3 "https://buymeacoffee.com/retrojunkies"
+#define MAXBALLS 3
+
+/*
+static void printDiagnostics(Ball* ball, Arena* arena)
+{
+  printf("Diagnostics: \n");
+  printf("ball speed: %d\n", ball->speed);
+  printf("ball bearing: %f\n", ball->bearing);
+  printf("remaining bricks: %d\n", arena->remaining);
+  printf("current level: %d\n", arena->level);
+  printf("-------------------------------------------------\n\n");
+
+  for(int i = 0; i < arena->brickcount; i++)
+  {
+    Brick* brick = arena->bricks[i];
+    printf("Brick %d (%d)\n", i, brick->type);
+    printf("Counter:  %d\n", brick->counter);
+    printf("IsDead:   %d\n", brick->isdead);
+    printf("HitCount: %d\n", brick->hitcount);
+    printf("* * * * * * * * * * *\n");
+  }
+}
+
+static int createContinueCode(App* app, Bat* player, Arena* arena)
+{
+	char* sc = ToBase36((int)(player->score / 10), 4);
+	char* encodedLevelText = EncodeLevel(sc, (int)(arena->level / 4), player->lives, 1);
+	char* finalLevelText = AddCheckDigit(encodedLevelText);
+	strncpy(app->LastCode, finalLevelText, 8);
+	free(sc);
+	free(finalLevelText);
+	return 0;
+}
+*/
+static int drawContinueCode(App* app)
+{
+	if(strlen(app->LastCode) > 0)
+		text_drawText(app, app->LastCode, 200,350, (SDL_Color){255,255,255,255}, TEXT_ARENA_CENTRED|TEXT_SHADOW, fnTitle);
+	return 0;	
+}
+
+/*
+static int gameOver(App* app, Bat* player, Gamestate* gamestate, Arena* arena, int* hi)
+{
+  *gamestate = gsDying;
+  text_drawText(app, "Game Over!", 200, 300, (SDL_Color){255,255,255,255}, TEXT_SHADOW, fnTitle);
+  drawContinueCode(app);
+	if(player->score > *hi)
+  {
+    saveHighScore(((int*)&player->score));
+    *hi = player->score;
+  }
+	memset(app->LastCode, 0, 9);
+  return *hi;
+}
+*/
+
+// Draw "Get Ready!" text and wait for three seconds
+static int reset(App* app, Ship* player, Arena* arena, Gamestate* gamestate)
+{
+  //player->x = arena->width / 2;
+  //bat_reset(player, arena->factory);
+  //bonus_freebonuses(&arena->bonuses, &arena->bonuscount);
+  //arena_freeBullets(arena);
+  arena->counter = SDL_GetTicks();
+  arena->bonuscounter = 0;
+  //af_setanimation(arena->factory, &(ball->sprite), "ball", 1, NULL, NULL, NULL);
+  //ball->state = bsSticky;
+  //ball->cx = player->x + (player->w / 2);
+  //ball->cy = player->y - (ball->radius);
+  //ball->speed = config_getballspeed();
+  //ball->warpdest = NULL;
+
+  text_drawText(app, "Get Ready!", 200, 300, (SDL_Color){255,255,255,255}, TEXT_CENTRED, fnTitle);
+ 
+ 	//if((arena->level % 4 == 0) && (*gamestate == gsNewLevel))
+	//{
+	//	createContinueCode(app, player, arena);
+	//	drawContinueCode(app);
+	//}
+
+  *gamestate = gsGetReady;
+  return 0;
+}
+
+void menu_quitClick(void* data)
+{
+  App* app = (App*)data;
+  app->gamestate = gsQuit;
+}
+
+void menu_startClick(void* data)
+{
+  App* app = (App*)data;
+  app->gamestate = gsStory;
+}
+
+void menu_creditsClick(void* data)
+{
+  App* app = (App*)data;
+  app->gamestate = gsCredits;
+}
+
+void menu_howToPlayClick(void* data)
+{
+  App* app = (App*)data;
+  app->gamestate = gsHelp;
+}
+
+void menu_fullScreenToggle(void* data, void* item)
+{
+  App* app = (App*)data;
+  MenuItem* menuitem = (MenuItem*)item;
+
+  if(menuitem->selectedvalue == 1)
+    SDL_SetWindowFullscreen(app->window, SDL_WINDOW_FULLSCREEN);
+  else
+    SDL_SetWindowFullscreen(app->window, 0);
+}
+
+void menu_donateClick(void* data)
+{
+  App* app = (App*)data;
+  app->gamestate = gsDonate;
+}
+
+//void menu_continueClick(void* data)
+//{
+//	App* app = (App*)data;
+//	app->gamestate = gsContinue;
+//}
+
+static void drawLivesAndScore(App* app, Ship* player)
+{
+	char score[10];
+	
+	sprintf(score, "%08d", player->score);
+
+  for(int i = 0; i < player->lives; i++)
+    //a_drawstaticframe(af_getanimation(factory, "life"), app->renderer, 40+(40*i), 560, 0, 255);
+    text_drawText(app, "a", 10 + (i*20), 50, (SDL_Color){255,255,255,255}, 0, fnTitle);
+	text_drawText(app, score, 10, 10, (SDL_Color){255,255,255,255}, 0, fnTitle);
+
+	text_drawText(app, "DISASTEROIDS!", 0, 10, (SDL_Color){255,255,255,255}, TEXT_CENTRED, fnTitle);
+
+}
+/*
+static void drawBackground1(App* app, Arena* arena, Bat* player, ResourceFactory* factory)
+{
+  int ofs = 0;
+  int ofs2 = 0;
+
+  if(player != NULL)
+  {
+    ofs = (player->x - ((arena->bounds.right + arena->bounds.left) / 2)) / -30;
+    ofs2 = (player->x - ((arena->bounds.right + arena->bounds.left) / 2)) / -10;
+  }
+
+  // Draw the background
+  a_drawstaticframe(arena->bg, app->renderer, 0, 0, 0, arena->alpha);
+  if(arena->mg != NULL)
+    a_drawstaticframe(arena->mg, app->renderer, ofs, 0, 0, arena->alpha);
+  if(arena->fg != NULL)
+    a_drawstaticframe(arena->fg, app->renderer, ofs2 - 30, 0, 0, arena->alpha);
+  a_drawstaticframe(af_getanimation(factory, "scores"), app->renderer, 600, 0, 0, 255);
+  a_drawstaticframe(af_getanimation(factory, "border"), app->renderer, 0, 0, 0, 255);
+}
+
+// Draw the right side of the frame again so that it sits over the brick shadows.
+// Can't draw the whole border after the bricks or ITS shadow overlaps the bricks!
+static void drawBackground2(App* app, ResourceFactory* factory)
+{
+  a_drawpartialframe(af_getanimation(factory, "border"), app->renderer, (SDL_Rect){ .x = 560, .y = 0, .h = 600, .w = 40 }, 560, 0, 0, 255);
+}
+
+static void drawArenaText(App* app, Arena* arena, Bat* player, int hi)
+{
+  char highs[10] = "";
+  char scores[10] = "";
+  char level[4] = "";
+
+  sprintf(highs, "%08d", hi);
+  sprintf(scores, "%08d", player->score);
+  sprintf(level, "%02d", arena->level);
+
+  text_drawText(app, "BARKOUT", 610, 20, (SDL_Color){255, 255, 255, 255}, TEXT_SHADOW, fnTitle);
+  text_drawText(app, "Hi Score", 610, 80, (SDL_Color){255,255,255,255}, TEXT_SHADOW, fnTitle);
+  text_drawText(app, highs, 610, 120, (SDL_Color){255, 255, 255, 255}, TEXT_SHADOW, fnTitle);
+  text_drawText(app, "Score", 610, 200, (SDL_Color){255,255,255,255}, TEXT_SHADOW, fnTitle);
+  text_drawText(app, scores, 610, 240, (SDL_Color){255, 255, 255, 255}, TEXT_SHADOW, fnTitle);
+  text_drawText(app, "Round", 610, 320, (SDL_Color){255,255,255,255}, TEXT_SHADOW, fnTitle);
+  text_drawText(app, level, 740, 320, (SDL_Color){255, 255, 255, 255}, TEXT_SHADOW, fnTitle);
+	//if(strlen(app->LastCode) > 0)
+	//	text_drawText(app, app->LastCode, 610, 400, (SDL_Color){255,255,255,255}, TEXT_SHADOW, fnTitle);
+}
+*/
+static void drawHowToPlay(App* app, Sprite* sprites)
+{
+  int left = 40;
+  int top = 30;
+
+  SDL_Color white = {255,255,255,255};
+
+  text_drawText(app, "How to Play", left, top, white, 0, fnStory);
+
+  char* howtotext = "Use your craft, Maus, to direct "
+                    "the energy ball and destroy the "
+                    "infrastructure of the evil Cat Empire!";
+  top = 75;
+  text_drawWrappedText(app, howtotext, left, top, white, 0, 700, fnStory);
+
+  char* bonustext = "Some of the structure may reveal "
+                    "powerful bonuses when destroyed. "
+                    "Use them wisely!";
+
+  top = 185;
+  text_drawWrappedText(app, bonustext, left, top, white, 0, 700, fnStory);
+
+  top = 300;
+  int snum = 0;
+
+  a_drawsprite(&(sprites[snum++]), app->renderer, left, top);
+  text_drawWrappedText(app, "The ball sticks to the Maus", left + 80, top , white, 0, 600, fnBody);
+  top += 35;
+
+  a_drawsprite(&(sprites[snum++]), app->renderer, left, top);
+  text_drawWrappedText(app, "Enable the Maus's laser guns", left + 80, top, white, 0, 600, fnBody);
+  top += 35;
+
+  a_drawsprite(&(sprites[snum++]), app->renderer, left, top);
+  text_drawWrappedText(app, "Enhance the energy ball", left + 80, top, white, 0, 600, fnBody);
+  top += 35;
+
+  a_drawsprite(&(sprites[snum++]), app->renderer, left, top);
+  text_drawWrappedText(app, "Extend the Maus!", left + 80, top, white, 0, 600, fnBody);
+  top += 35;
+
+  a_drawsprite(&(sprites[snum++]), app->renderer, left, top);
+  text_drawWrappedText(app, "Divide the ball into three!", left + 80, top, white, 0, 600, fnBody);
+  top += 35;
+
+  a_drawsprite(&(sprites[snum++]), app->renderer, left, top);
+  text_drawWrappedText(app, "Shrink the Maus. Avoid this one.", left + 80, top, white, 0, 600, fnBody);
+  top += 35;
+
+  a_drawsprite(&(sprites[snum++]), app->renderer, left, top);
+  text_drawWrappedText(app, "Extra player!", left + 80, top, white, 0, 600, fnBody);
+  top += 35;
+
+  a_drawsprite(&(sprites[snum++]), app->renderer, left, top);
+  text_drawWrappedText(app, "Warp to the next round", left + 80, top, white, 0, 600, fnBody);
+}
+
+static void drawCredits(App* app)
+{
+  int left = 150;
+
+  SDL_Color white = {255,255,255,255};
+
+  text_drawText(app, "Credits", left, 110, white, 0, fnTitle);
+  text_drawText(app, "_____________________________________", left, 120, white, 0, fnTitle);
+  text_drawText(app, "Programming", left, 160, white, 0, fnTitle);
+  text_drawText(app, "Graphics", left, 200, white, 0, fnTitle);
+  text_drawText(app, "Sound FX", left, 240, white, 0, fnTitle);
+  text_drawText(app, "Music", left, 280, white, 0, fnTitle);
+
+  text_drawText(app, "Go team!", left, 380, white, 0, fnTitle);
+
+  text_drawText(app, "https://www.retrojunkies.co.uk/fathorsegames", 20, 560, white, TEXT_CENTRED, fnBody);
+
+  for(int i = 0; i < 4; i++)
+    text_drawText(app, "Fat Harry", left + 260, 160 + (i*40), white, 0, fnTitle);
+}
+
+static void drawDonate(App* app)
+{
+  int left = 100;
+
+  SDL_Color white = {255,255,255,255};
+
+  text_drawWrappedText(app, "Donate! (please)", left, 100, white, 0, 600, fnBody);
+  text_drawWrappedText(app, DON1, left, 160, white, 0, 500, fnBody);
+  text_drawWrappedText(app, DON2, left, 280, white, 0, 500, fnBody);
+  text_drawWrappedText(app, DON3, left, 400, white, 0, 500, fnBody);
+  text_drawWrappedText(app, "Thanks.", left, 480, white, 0, 500, fnBody);
+}
+
+int main(int argc, char** argv)
+{
+  srand(time(0));
+  Uint32 flags = SDL_WINDOW_OPENGL;
+  int startlevel = 1;
+  bool binarylevels = true;
+  char customlevelfile[255] = "";
+  bool customlevels = false;
+  bool debug = false;
+  // Test parameters here before initialising anything
+  // as we may only be compiling a level file
+  for(int i = 0; i < argc; i++)
+	{
+    // Play fullscreen
+    if(strcmp(argv[i], "-f") == 0)
+    {
+      flags |= SDL_WINDOW_FULLSCREEN;
+    }
+    // Show debugging information
+    if(strcmp(argv[i], "-d") == 0)
+    {
+      debug = true;
+    }
+    // Select starting level
+    if(strcmp(argv[i], "-l") == 0)
+    {
+      if(i+1 < argc)
+        sscanf(argv[i+1], "%d", &startlevel);
+    }
+    // Compile a level file
+    if(strcmp(argv[i], "-c") == 0)
+    {
+      char folder[255];
+      if(i+1 < argc)
+        sscanf(argv[i+1], "%s", folder);
+      //levels_compile(folder, ".");
+      // Compile level file and quit
+      return 0;
+    }
+    // Load uncompressed level files
+    if(strcmp(argv[i], "-u") == 0)
+    {
+      binarylevels = false;
+    }
+    // Load custom compressed level file
+    if(strcmp(argv[i], "-f") == 0)
+    {
+      binarylevels = true;
+      customlevels = true;
+      if(i+1 < argc)
+        sscanf(argv[i+1], "%s", customlevelfile);
+    }
+
+	}
+
+	App app;
+	if(SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO) < 0)
+	{
+		return 1;
+	}
+
+	IMG_Init(IMG_INIT_PNG);
+
+	if(TTF_Init() == -1)
+	{
+    printf("TTF_Init: %s\n", TTF_GetError());
+    return 0;
+	}
+
+	if(Mix_Init(MIX_INIT_MP3) == -1)
+	{
+    printf("MIX_Init: %s\n", Mix_GetError());
+    return 0;
+	}
+
+	Mix_OpenAudio(22050, MIX_DEFAULT_FORMAT, MIX_DEFAULT_CHANNELS, 1024);
+	
+	config_load();
+  if(debug)
+    config_setdebug(true);
+
+	if((flags & SDL_WINDOW_FULLSCREEN) == SDL_WINDOW_FULLSCREEN)
+    config_setfullscreen(true);
+
+  if(config_isfullscreen())
+    flags = flags | SDL_WINDOW_FULLSCREEN;
+
+  text_loadFonts(&app);
+
+	app.window = SDL_CreateWindow("Disasteroids!", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, SCREENW, SCREENH, flags);
+	app.renderer = SDL_CreateRenderer(app.window, -1, SDL_RENDERER_ACCELERATED);
+	app.music = af_loadmusic("barkanoidiii.mp3");
+  app.gamestate = gsTitle;
+	app.LastCode = calloc(9, sizeof(char));
+
+	SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "linear");
+  SDL_RenderSetLogicalSize(app.renderer, SCREENW, SCREENH);
+
+  ResourceFactory f = { .anims = NULL, .animationcount = 0, .samples = NULL, .samplecount = 0 };
+
+  // Load animations and samples
+  loadResources(&f, app.renderer);
+
+  //Bat player = { .x = 100, .y = 520, .w = psNormal, .h = 25, .maxspeed = 8, .speed = 0, .targetspeed = 0, .lives = config_getstartlives(), .score = 0 };
+  //player.sprite.anim = af_getanimation(&f, "bat");
+  //player.sprite.currentframe = 0;
+  //player.sprite.lastticks = 0;
+  //player.sprite.loop = 1;
+  //player.sprite.state = asLooping;
+  //player.warpenabled = false;
+
+	Ship player = { 
+									.x = 512, 
+									.y = 384, 
+									.length = 20, 
+									.shipBearing = 180, 
+									.thrustBearing = 0, 
+									.lives = config_getstartlives(), 
+									.score = 0, 
+									.speed = 0, 
+									.wingspan = 10, 
+									.sweep = 130, 
+									.velocity = 0, 
+									.thrust = 0,
+									.engineon = false,
+									.bulletspeed = 2,
+									.bullets = 
+									{
+										.capacity = 0,
+										.size = 0,
+										.first = NULL
+									}
+
+								};
+
+//
+//	for(int i = 0; i < 10; i++)
+//	{
+//		
+//	}
+
+  // Set up the balls
+	// Allow for multiple balls
+
+	//Vector* balls = vector_new();
+	//Ball* b1 = arena_addBall(&f, &player, 60, player.x + 40, 310, bsSticky);
+	//vector_add(balls, b1);
+
+  //Sprite intro = { .currentframe = 0, .lastticks = 0, .loop = 0, .state = asPlayToEnd };
+  //intro.anim = af_getanimation(&f, "intro");
+  //intro.data = NULL;
+  //intro.sender = NULL;
+  //intro.onanimfinished = NULL;
+
+	/*
+  Sprite warp = { .currentframe = 0, .lastticks = 0, .loop = 1, .state = asLooping };
+  warp.anim = af_getanimation(&f, "warp");
+  warp.data = NULL;
+  warp.sender = NULL;
+  warp.onanimfinished = NULL;
+	*/
+
+  // Set up the level
+  
+	Arena arena = 
+    { 
+        .bonuscounter = 0,
+        .bonuscount = 0,
+        .bulletcount = 0,
+        .level = 3,
+        .lastbonus = 0,
+        .counter = 0,
+        .factory = NULL
+    };
+
+  int spritecount = 8;
+  Sprite bonussprites[spritecount];
+  // "dsecplw";
+  // Yes, 8. No \0.
+  char bonustypes[8] = "cldemspw";
+  char bonusstring[8] = "bonus-x";
+  for(int i=0; i < spritecount; i++)
+  {
+    //Sprite* s = malloc(sizeof(Sprite));
+    // Change the last letter of the bonus sprite name
+    bonusstring[6] = bonustypes[i];
+    bonussprites[i].currentframe = 0;
+    bonussprites[i].lastticks = 0;
+    bonussprites[i].data = NULL;
+    bonussprites[i].sender = NULL;
+    bonussprites[i].onanimfinished = NULL;
+    bonussprites[i].loop = 1;
+    bonussprites[i].state = asLooping;
+    bonussprites[i].anim = af_getanimation(&f, bonusstring);
+  }
+
+  Menu menu = { .itemcount = 0, .items = NULL, .selectedindex = 0, .optionx = 500, .x = 100, .y = 240, .app=&app };
+  MenuItem* item = menu_addItem(&menu, "Start game", NULL, menu_startClick, NULL);
+  //item = menu_addItem(&menu, "Control method", (int*)config_getcontrolmethod(), NULL, NULL);
+  //menu_addItemOption(item, "Disasteroids", OPT2, (int)cmBarkanoid);
+  //menu_addItemOption(item, "Classic", OPT1, (int)cmClassic);
+  item = menu_addItem(&menu, "Full screen", (int*)config_getfullscreen(), NULL, menu_fullScreenToggle);
+  menu_addItemOption(item, "Yes", "Stretch to full screen", 1);
+  menu_addItemOption(item, "No", "Play windowed", 0);
+  menu_addItem(&menu, "How to Play", NULL, menu_howToPlayClick, NULL);
+  menu_addItem(&menu, "Credits", NULL, menu_creditsClick, NULL);
+  menu_addItem(&menu, "Donate!", NULL, menu_donateClick, NULL);
+  //menu_addItem(&menu, "Continue", NULL, menu_continueClick, NULL);
+	menu_addItem(&menu, "Quit", NULL, menu_quitClick, NULL);
+
+	//Save save;
+
+	//save_createLetters(&save);
+
+	SDL_ShowCursor(SDL_DISABLE);
+
+  if(binarylevels)
+  {
+    char* levelfile = "levels.dat";
+    char apath[255] = "./Levels/";
+
+    #ifdef INSTALLDIR
+    if(config_getinstalled())
+      strcpy(apath, INSTALLDIR "/Levels/");
+    #endif
+    strcat(apath, levelfile);
+//    if(customlevels)
+//      arena_loadBinary(&f, &arena, customlevelfile);
+//    else
+//      arena_loadBinary(&f, &arena, apath);
+  }
+//  else
+//    arena_loadLevels(&arena, &f);
+
+  int hi = loadHighScore();
+
+  Star stars[STARS];
+  intro_init(stars);
+
+  FlashText pressstart = { .text = "Press 1P Start", .alpha = 0, .targetalpha = 255, .duration = 0, .font = fnTitle };
+
+  FlashStory story1 = {
+    .current = 0,
+    .count = 4,
+    .texts = {
+      "After the mothership was destroyed,",
+      "only to be warped in space,",
+      " ",
+      " "
+    }
+  };
+
+  FlashStory story2 = {
+    .current = 0,
+    .count = 4,
+    .texts = {
+      "only pilot Willow \"Twiglet\" Twiglington",
+      "trapped on the unforgiving surface",
+      "Take off every Twig!",
+      " "
+    }
+  };
+
+  FlashStory story3 = {
+    .current = 0,
+    .count = 4,
+    .texts = {
+      "and her spacecraft The Maus survived",
+      "of a hitherto unknown planet...",
+      " ",
+      " "
+    }
+  };
+
+  FlashText txt1 = { .alpha = 0, .targetalpha = 255, .duration = 0, .font = fnStory };
+  FlashText txt2 = { .alpha = 0, .targetalpha = 255, .duration = 0, .font = fnStory };
+  FlashText txt3 = { .alpha = 0, .targetalpha = 255, .duration = 0, .font = fnStory };
+  FlashText fathorse = { .alpha = 0, .targetalpha = 255, .duration = 0, .text = "Fat Horse Games presents", .font = fnTitle };
+
+  bool titlefinished = false;
+  int currentlywarping = 0;
+  Uint32 aCounter = 0;
+
+  while(app.gamestate != gsQuit)
+  {
+    // Compare this to the end of the loop to set the frame rate
+    Uint32 startticks = SDL_GetTicks();
+    Uint32 delay = 0;
+
+//    int islostball = 0;
+
+    // If we check the keys here, then in many cases the state
+    // will only change here, so we'll draw the correct frame each time
+    SDL_Event e;
+		if (SDL_PollEvent(&e)) {
+			if (e.type == SDL_QUIT) {
+				break;
+			}
+
+			/* // We'll come back to this...
+			if (e.type == SDL_MOUSEMOTION)
+			{
+        if (e.motion.x > player.x + player.w)
+        {
+          if(currentlywarping == 0)
+            player.targetspeed = player.maxspeed;
+        }
+        else if (e.motion.xrel < player.x)
+        {
+          if(currentlywarping == 0)
+            player.targetspeed = -1 * player.maxspeed;
+        }
+        else
+        {
+          // Mouse is stationary
+          player.targetspeed = 0;
+        }
+			}
+      */
+
+			if (e.type == SDL_KEYUP)
+      {
+        switch(e.key.keysym.sym)
+        {
+          case SDLK_z:
+          case SDLK_LEFT:
+//            if(currentlywarping == 0)
+//              player.targetspeed = player.speed > 0 ? player.targetspeed : 0;
+						player.speed = 0;
+          break;
+          case SDLK_x:
+          case SDLK_RIGHT:
+//            if(currentlywarping == 0)
+//              player.targetspeed = player.speed < 0 ? player.targetspeed : 0;
+//						player.shipBearing += 5;
+	//					if(player.shipBearing == 360)
+		//					player.shipBearing = 0;
+						player.speed = 0;
+          break;
+					case SDLK_UP:
+						if(app.gamestate == gsRunning)
+						{
+							player.velocity = 0.0;
+							player.engineon = false;
+						}
+					break;
+        }
+      }
+
+      if (e.type == SDL_KEYDOWN)
+      {
+
+        // Not part of the switch because we need "break" to break the loop...
+        if(e.key.keysym.sym == SDLK_ESCAPE)
+        {
+          if((app.gamestate != gsTitle) && (app.gamestate != gsStory))
+					{
+						// Remove all but one ball
+						//for(int bn = balls->size - 1; bn > 0; bn--)
+						//{
+						//	Ball* b = (Ball*)(vector_item(balls, bn));
+						//	vector_remove(balls, b);
+						//	free(b);
+						//}
+            app.gamestate = gsTitle;
+					}
+          else
+            break;
+        }
+
+        switch(e.key.keysym.sym)
+        {
+          case SDLK_1:
+            
+          break;
+
+          case SDLK_k:
+            // Kill self - if stuck in a loop, for example
+//            if(app.gamestate == gsRunning)
+//                islostball = 1;
+          break;
+
+          case SDLK_z:
+          case SDLK_LEFT:
+            if(app.gamestate == gsRunning)
+            {
+//              if(currentlywarping == 0)
+//                player.targetspeed = -1 * player.maxspeed;
+							//player.shipBearing -= 5;
+							//if(player.shipBearing < 0)
+							//	player.shipBearing = 355;
+							player.speed = 5;
+
+            }
+            else if(app.gamestate==gsMenu)
+            {
+              menu_previousOption(&menu);
+            }
+						//else if(app.gamestate==gsContinue)
+						//{
+						//	save_moveLetter(&save, false, false);
+						//}
+          break;
+          case SDLK_x:
+          case SDLK_RIGHT:
+            if(app.gamestate == gsRunning)
+            {
+//              if(currentlywarping == 0)
+//                player.targetspeed = player.maxspeed;
+							//player.shipBearing -= 5;
+							//if(player.shipBearing < 0)
+							//	player.shipBearing = 355;
+							player.speed = -5;
+     
+						}
+            else if(app.gamestate==gsMenu)
+            {
+              menu_nextOption(&menu);
+            }
+						//else if(app.gamestate==gsContinue)
+						//{
+						//	save_moveLetter(&save, true, false);
+						//}
+          break;
+          case SDLK_p: 
+						if(app.gamestate == gsRunning)
+						{
+							app.gamestate = gsPaused;
+						}
+						else if (app.gamestate == gsPaused)
+						{
+							app.gamestate = gsRunning;
+						}
+					break;
+          case SDLK_UP:
+            if(app.gamestate==gsMenu)
+            {
+              menu_previous(&menu);
+              break;
+            //} else if(app.gamestate==gsContinue)
+						//{
+						//	save_moveLetter(&save, false, true);
+						//	break;
+						} else if(app.gamestate == gsRunning)
+						{
+							player.velocity = 0.5;
+							if(!player.engineon)
+							{
+								ship_startengine(&player);
+							}
+						}
+          break;
+          case SDLK_SPACE:
+            if(app.gamestate == gsRunning)
+            {
+              af_playsample(&f, "laser");
+              ship_createbullet(&player);
+            }
+            //else if (app.gamestate == gsRunning)
+            //{
+							// Space pressed. If the ball is stuck to the bat after a life or start of level, set bearing to 30, otherwise don't change the bearing.
+							// There should only ever be one ball in this situation, as it's either after a death, at the start of a level, or no sticky is possible because multiple balls are in play
+							//Ball* b;
+							//for(int bn = 0; bn < balls->size; bn++)
+							//{
+							//	b = (Ball*)(vector_item(balls, bn));
+              //	b->bearing = b->state == bsSticky ? 30 : b->bearing;
+              //	b->state = b->state == bsSticky ? bsNormal : b->state == bsStuck ? bsLoose : b->state;
+							//}
+            //}
+          // fall through
+          case SDLK_RETURN:
+            if((app.gamestate == gsTitle) || (app.gamestate == gsCredits) || (app.gamestate == gsHelp) || (app.gamestate == gsDonate))
+              app.gamestate = gsMenu;
+            else if(app.gamestate == gsMenu)
+              menu_execute(&menu);
+            else if(app.gamestate == gsStory)
+            {
+                
+              story1.current = 0;
+              story2.current = 0;
+              story3.current = 0;
+              txt1.alpha = 0;
+              txt2.alpha = 0;
+              txt3.alpha = 0;
+              app.gamestate = gsNewLevel;
+              //app.gamestate = gsRunning;
+              //player.lives = config_getstartlives();
+              arena.level = startlevel;
+              //player.score = 0;
+              //arena.alpha = 255;
+              //arena_loadBricks(&arena, arena.level);
+              //arena_initlevel(&arena, 1);            
+            }
+          break;
+          case SDLK_DOWN:
+            if(app.gamestate==gsMenu)
+            {
+              menu_next(&menu);
+            }
+						//if(app.gamestate==gsContinue)
+						//{
+						//	save_moveLetter(&save, true, true);
+						//}
+          break;
+          //case SDLK_F1:
+            //printDiagnostics(ball, &arena);
+          //break;
+        }
+      }
+		}
+
+		// Clear the screen
+		SDL_SetRenderDrawColor(app.renderer, 0, 0, 0, 255);
+	  SDL_RenderClear(app.renderer);
+
+    if(app.gamestate == gsTitle)
+    {
+      if(Mix_PlayingMusic() == 0)
+          Mix_PlayMusic(app.music, 0);
+
+      if(!titlefinished)
+      {
+        // Returns true when text has completed fade in and out
+        titlefinished = text_drawFlashText(&app, &fathorse, 200, 100, 2);
+      }
+      intro_drawstars(app.renderer, stars);
+      if(titlefinished)
+      {
+        //a_drawsprite(&intro, app.renderer, 200, 120);
+        text_drawFlashText(&app, &pressstart, 260, 180, 2);
+        //a_drawstaticframe(af_getanimation(&f, "logo"), app.renderer, 700, 500, 0, 255);
+      }
+
+      intro_movestars(stars);
+    }
+
+    if(app.gamestate == gsMenu)
+    {
+      titlefinished = true;
+
+      intro_drawstars(app.renderer, stars);
+      //a_drawsprite(&intro, app.renderer, 200, 120);
+     	text_drawText(&app, "DISASTEROIDS!", 100, 100, (SDL_Color){255,255,255,255}, 0, fnBigTitle);
+
+      menu_drawMenu(&menu, &app);
+
+      intro_movestars(stars);
+      // problem is that on our next loop, if we've changed
+      // to gsNewLevel we draw one single frame of the previous
+      // level layout
+      text_drawText(&app, "Copyright 2026 Stephen Branley, Fat Horse Games", 10, 560, (SDL_Color){255,255,255,255}, 0, fnSmallBody);
+      a_drawstaticframe(af_getanimation(&f, "logo"), app.renderer, 700, 500, 0, 255);
+    }
+
+		//if(app.gamestate == gsContinue)
+		//{
+		//	intro_drawstars(app.renderer, stars);
+		//	intro_movestars(stars);
+		//	save_drawLetters(&app, &save);
+		//}
+
+    if((app.gamestate == gsCredits) || (app.gamestate == gsHelp) || (app.gamestate == gsDonate))
+    {
+      titlefinished = true;
+      intro_drawstars(app.renderer, stars);
+
+      if(app.gamestate == gsCredits)
+        drawCredits(&app);
+      else if(app.gamestate == gsHelp)
+        drawHowToPlay(&app, bonussprites);
+      else
+        drawDonate(&app);
+
+      intro_movestars(stars);
+    }
+
+    if(app.gamestate == gsStory)
+    {
+      titlefinished = true;
+      //arena.level = startlevel;
+      intro_drawstars(app.renderer, stars);
+      //a_drawsprite(&intro, app.renderer, 200, 220);
+      text_drawFlashStory(&app, &story1, &txt1, 300);
+      text_drawFlashStory(&app, &story2, &txt2, 340);
+      if(text_drawFlashStory(&app, &story3, &txt3, 380))
+        app.gamestate = gsNewLevel;
+      intro_movestars(stars);
+    }
+    // Again, we want another frame to draw the level
+    // before we say "Get Ready!" so we need an else
+    // to avoid moving directly from gsStory to gsNewLevel
+    // in one loop iteration.
+    else if(app.gamestate == gsNewLevel)
+    {
+      printf("New level\n");
+      if(Mix_PlayingMusic() != 0)
+        Mix_HaltMusic();
+      arena_initlevel(&arena, arena.level);
+      intro_drawstars(app.renderer, stars);
+      intro_movestars(stars);
+      //drawBackground1(&app, &arena, NULL, &f);
+      //drawArenaText(&app, &arena, &player, hi);
+      //arena_drawBricks(&arena, app.renderer);
+      //drawBackground2(&app, &f);
+      //arena_drawBricks(&arena, app.renderer);
+      // Reset immediately changes the state to gsGetReady
+      // So this block only executes once
+
+      //Vector* cats = arena.levels[arena.level - 1].cats;
+
+      //for(int cnum = 0; cnum < cats->size; cnum++)
+			//{
+			//	((Cat*)(vector_item(cats, cnum)))->state = csDead;
+			//}
+//        ((Cat*)(cats->elements[cnum]))->state = csDead;
+
+			// This should only occur when only a single ball is in play
+			//Ball* b;
+			//for(int bn = 0; bn < balls->size; bn++)
+			//{
+			//	b = (Ball*)(vector_item(balls, bn));
+      reset(&app, &player, &arena, &app.gamestate);
+			//}
+    }
+
+    if(app.gamestate == gsPaused)
+    {
+      //drawBackground1(&app, &arena, &player, &f);
+      //drawArenaText(&app, &arena, &player, hi);
+      //arena_drawBricks(&arena, app.renderer);
+      //drawBackground2(&app, &f);
+      //bonus_drawbonuses(arena.bonuses, arena.bonuscount, app.renderer);
+      //Vector* cats = arena.levels[arena.level - 1].cats;
+      //cat_draw(cats, app.renderer);
+      intro_drawstars(app.renderer, stars);
+			text_drawText(&app, "PAUSED", 0, 350, (SDL_Color){255,255,255,255}, TEXT_ARENA_CENTRED | TEXT_SHADOW, fnTitle);
+    }
+
+    if((app.gamestate == gsRunning) || (app.gamestate == gsLostLife))
+    {
+      intro_drawstars(app.renderer, stars);
+			intro_movestars(stars);
+
+      // Move the ship, check we're within the arena
+      if(app.gamestate == gsRunning)
+			{
+				player.shipBearing += player.speed;
+				ship_moveship(&player);
+				arena_moverocks(&arena);
+			}
+//        currentlywarping = bat_movebat(&player, arena.bounds);
+
+      //if(currentlywarping == 0)
+      //{
+      //  bonus_movebonuses(&arena.bonuses, &arena.bonuscount, arena.bounds);
+      //  arena_moveBullets(&arena);
+      //}
+      //else
+      //{
+      //  if(!Mix_Playing(-1))
+      //    af_playsample(&f, "warp");
+
+        // Don't add the scores for the remaining bricks in one go,
+        // but add them incrementally for a nice "ticking up" effect.
+      //  if(arena.remaining > 0)
+      //  {
+      //    player.score += BRICKSCORE;
+      //    arena.remaining--;
+      //  }
+
+      //  if((player.x > arena.bounds.right + 20) && (arena.remaining == 0))
+      //  {
+      //    arena.remaining = 0;
+      //    player.targetspeed = 0;
+      //  }
+      //}
+      //arena_checkBulletCollisions(&arena, &player);
+      //for(int bn = 0; bn < balls->size; bn++)
+			//{
+			//	Ball* b = (Ball*)(vector_item(balls, bn));
+			//	arena_batCollidesBonus(&arena, &player, b, balls);
+			//}
+
+    } // This one is an else because we need one loop between
+      // change of app.gamestate for the Get Ready text to render.
+
+    if(app.gamestate == gsGetReady)
+    {
+      currentlywarping = 0;
+      af_playsample(&f, "getready");
+      delay = 3000;
+      app.gamestate = gsRunning;
+//      arena.counter = startticks;
+    }
+
+    if(app.gamestate == gsDying)
+    {
+      app.gamestate = gsTitle;
+      delay = 3000;
+    }
+
+	  if((app.gamestate == gsRunning) || (app.gamestate == gsPaused) ||
+      (app.gamestate == gsNewLevel) || (app.gamestate == gsGetReady) || (app.gamestate == gsLostLife))
+	  {
+
+      drawLivesAndScore(&app, &player);
+      // Draw the balls
+			//Ball* b;
+			//for(int bn = 0; bn < balls->size; bn++)
+			//{
+			//	b = (Ball*)(vector_item(balls, bn));
+      //	if((b->cy - b->radius) < (arena.bounds.bottom - 15))
+      //	{
+      //  	ball_drawBall(b, app.renderer);
+     	//	}
+			//}
+
+      // Draw the bat
+      //bat_drawbat(&player, app.renderer, arena.bounds);
+
+			ship_drawship(&player, app.renderer);
+			arena_drawrocks(&arena, app.renderer);
+      arena_checkbullets(&arena, &player);
+
+      //arena_drawBullets(&arena, app.renderer);
+    }
+
+    // Display everything on the screen
+    // There appears to be a bug in SDL whereby calling SDL_RenderClear or perhaps
+    // the SDL drawing functions without calling SDL_RenderPresent causes some memory leaks.
+    SDL_RenderPresent(app.renderer);
+
+    Uint32 endticks = SDL_GetTicks();
+		// Fix refresh rate as 60fps
+    // This means we need to spend 16.6667 miliseconds per frame,
+    // so if less time than that has expired, delay for the remainder.
+    if(endticks - startticks < 16.6667)
+      SDL_Delay(floor(16.6667 - (endticks - startticks)));
+
+    if(delay > 0)
+      SDL_Delay(delay);
+  }
+
+  // Exiting the program, so free all allocated memory
+
+  config_save();
+
+
+
+	free(app.LastCode);
+	//for(int bn = 0; bn < balls->size; bn++)
+	//{	
+	//	Ball* b = (Ball*)(vector_item(balls, bn));
+	//	free(b);
+	//}
+  
+	//vector_free(balls);
+	menu_free(&menu);
+  //bonus_freebonuses(&arena.bonuses, &arena.bonuscount);
+  //arena_freeLevels(&arena);
+  //arena_freeBullets(&arena);
+
+  af_freesamples(&f);
+  af_freeanimations(&f);
+
+  SDL_DestroyRenderer(app.renderer);
+	SDL_DestroyWindow(app.window);
+
+	Mix_FreeMusic(app.music);
+	Mix_CloseAudio();
+
+	text_freeFonts(&app);
+
+	Mix_Quit();
+	TTF_Quit();
+	IMG_Quit();
+	SDL_Quit();
+}

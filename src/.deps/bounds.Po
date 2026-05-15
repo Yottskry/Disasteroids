@@ -1,0 +1,5 @@
+src/bounds.o: src/bounds.c /usr/include/stdc-predef.h src/bounds.h \
+ /usr/lib/gcc/aarch64-linux-gnu/12/include/stdbool.h
+/usr/include/stdc-predef.h:
+src/bounds.h:
+/usr/lib/gcc/aarch64-linux-gnu/12/include/stdbool.h:
