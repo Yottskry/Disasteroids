@@ -74,37 +74,32 @@ void arena_moverocks(Arena* arena)
 bool arena_checkbullets(Arena* arena, Ship* player)
 {
   // Check each bullet for a collision against each rock
-  // Do this with the intersection of two lines:
-  // One being each edge of the rock, and the other
-  // being the line between the bullet start position
-  // and the bullet end position
-  for(int j = 0; j < player->bullets.size; j++)
+	// We were going to be clever and do this with the intersections of lines
+	// but that raised more issues than it solved, so we'll use a simple bounding 
+	// circle, slightly within the perimeter of the asteroid
+  
+  // For each rock...
+  for(int i = 0; i < arena->rocks.size; i++)
   {
-    Bullet* b = (Bullet*)(vector_item(&(player->bullets), j));
-    double dy = b->dy;
-    double dx = b->dx;
-    double c = b->c; //findC(dy, dx, b->y, b->x);
-    //printf("dy %f dx %f\n", dy, dx);
-    printf("y = %fx + %f\n", b->m, c);
-    for(int i = 0; i < arena->rocks.size; i++)
+    Asteroid* rock = vector_item(&(arena->rocks), i);
+    /// ... and each bullet
+    for(int j = 0; j < player->bullets.size; j++)
     {
-      Asteroid* rock = vector_item(&(arena->rocks), i);
-      for(int k = 0; k < ROCKNODES; k++)
-      {
-        int l = k+1;
-        if(k == ROCKNODES-1)
-          l = 0;
-        int pt1y = rock->yposns[k];
-        int pt1x = rock->xposns[k];
-        int pt2y = rock->yposns[l];
-        int pt2x = rock->xposns[l];
-        double nodec = findC(pt1y - pt2y, pt1x - pt2x, pt1y, pt1x);
-
-        // Solve as simultaneous equations for X and Y
-        // allowing for cases where dx == 0
-      }
+      Bullet* bullet = vector_item(&(player->bullets), j);
+      // Is the bullet within the bounding circle of the rock?
+      double xs = (bullet->x - rock->x);
+      xs = xs * xs;
+      double ys = (bullet->y - rock->y);
+      ys = ys * ys;
+      double rs = rock->scale * ROCKRADIUS;
+      if ((xs + ys) < (rs * rs))
+        printf("Collision\n");
+      // If a collision occurs, remove this bullet
+      // do whatever is needed to the rock, and continue 
+      // to the next bullet / rock
     }
   }
+
   return false;
 }
 

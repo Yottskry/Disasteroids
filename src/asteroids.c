@@ -980,6 +980,7 @@ int main(int argc, char** argv)
 				player.shipBearing += player.speed;
 				ship_moveship(&player);
 				arena_moverocks(&arena);
+        arena_checkbullets(&arena, &player);
 			}
 //        currentlywarping = bat_movebat(&player, arena.bounds);
 
