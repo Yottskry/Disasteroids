@@ -28,7 +28,7 @@
 #define EXPLOSIONPARTICLES 200
 #define BRICKSPEED 3
 #define BRICKSCORE 10
-#define ROCKRADIUS 10
+#define ROCKRADIUS 20
 
 #define ROCKNODES 10
 
@@ -38,7 +38,7 @@
 #include <SDL2/SDL2_gfxPrimitives.h>
 
 typedef enum { rsSmall = 1, rsMedium = 2, rsLarge = 4 } RockSize;
-typedef enum { eNone = 0, eLeft = 1, eRight = 2, eTop = 4, eBottom = 8, eTopLeft = 16, eTopRight = 32, eBottomLeft = 64, eBottomRight = 128 } Edge;
+//typedef enum { eNone = 0, eLeft = 1, eRight = 2, eTop = 4, eBottom = 8, eTopLeft = 16, eTopRight = 32, eBottomLeft = 64, eBottomRight = 128 } Edge;
 
 extern const Sint16 asteroidx[];
 extern const Sint16 asteroidy[];

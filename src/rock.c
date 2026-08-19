@@ -44,7 +44,7 @@ void rock_draw(Asteroid* rock, SDL_Renderer* renderer)
 		thickLineRGBA(renderer, rock->xposn[i], rock->yposn[i], rock->xposn[j], rock->yposn[j], 2, 255, 255, 255, 255);		
 	}
 
-  circleRGBA(renderer, rock->x, rock->y, 20 * rock->scale, 255, 0, 255, 255);
+  circleRGBA(renderer, rock->x, rock->y, ROCKRADIUS * rock->scale, 255, 0, 255, 255);
 
 	//polygonRGBA(renderer, rock->xposn, rock->yposn, ROCKNODES, 255, 255, 255, 255);
 	

@@ -980,7 +980,11 @@ int main(int argc, char** argv)
 				player.shipBearing += player.speed;
 				ship_moveship(&player);
 				arena_moverocks(&arena);
-        arena_checkbullets(&arena, &player);
+        if(arena_checkbullets(&arena, &player))
+        {
+          printf("Level complete\n");
+        }
+        //SDL_Delay(200);
 			}
 //        currentlywarping = bat_movebat(&player, arena.bounds);
 

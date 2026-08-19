@@ -137,7 +137,7 @@ void ship_createbullet(Ship* player)
 	// Work out dx/dy from shipBearing
 	bullet->dx = bullet->speed * sin(player->shipBearing * (PI / 180));
 	bullet->dy = bullet->speed * cos(player->shipBearing * (PI / 180));
-  bullet->m = (dy / dx);
+  //bullet->m = (bullet->dy / bullet->dx);
   bullet->c = findC(bullet->dy, bullet->dx, bullet->y, bullet->x);
   
   bullet->distance = 0;

@@ -71,6 +71,7 @@ void arena_moverocks(Arena* arena)
   }
 }
 
+// Returns true if level complete
 bool arena_checkbullets(Arena* arena, Ship* player)
 {
   // Check each bullet for a collision against each rock
@@ -79,11 +80,11 @@ bool arena_checkbullets(Arena* arena, Ship* player)
 	// circle, slightly within the perimeter of the asteroid
   
   // For each rock...
-  for(int i = 0; i < arena->rocks.size; i++)
+  for(int i = arena->rocks.size - 1; i >= 0; i--)
   {
     Asteroid* rock = vector_item(&(arena->rocks), i);
     /// ... and each bullet
-    for(int j = 0; j < player->bullets.size; j++)
+    for(int j = player->bullets.size - 1; j >= 0; j--)
     {
       Bullet* bullet = vector_item(&(player->bullets), j);
       // Is the bullet within the bounding circle of the rock?
@@ -92,15 +93,36 @@ bool arena_checkbullets(Arena* arena, Ship* player)
       double ys = (bullet->y - rock->y);
       ys = ys * ys;
       double rs = rock->scale * ROCKRADIUS;
-      if ((xs + ys) < (rs * rs))
-        printf("Collision\n");
-      // If a collision occurs, remove this bullet
-      // do whatever is needed to the rock, and continue 
-      // to the next bullet / rock
+//      printf("Testing %d, %d\n", xs+ys, rs*rs);
+      if ((xs + ys) <= (rs * rs))
+      {
+        // If a collision occurs, remove this bullet
+        // do whatever is needed to the rock, and continue 
+        // to the next bullet / rock
+        vector_remove(&(player->bullets), bullet);
+        free(bullet);
+        
+        if(rock->size == rsLarge)
+        {
+          Asteroid* newrock = rock_create(rock->x, rock->y, rsMedium);
+          vector_add(&(arena->rocks), newrock);
+          newrock = rock_create(rock->x, rock->y, rsMedium);
+          vector_add(&(arena->rocks), newrock);
+        }
+        else if(rock->size == rsMedium)
+        {
+          Asteroid* newrock = rock_create(rock->x, rock->y, rsSmall);
+          vector_add(&(arena->rocks), newrock);
+          newrock = rock_create(rock->x, rock->y, rsSmall);
+          vector_add(&(arena->rocks), newrock);
+        }
+
+        // Remove original rock
+        vector_remove(&(arena->rocks), rock);
+      }
     }
   }
-
-  return false;
+  return arena->rocks.size == 0;
 }
 
 
