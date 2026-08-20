@@ -27,7 +27,7 @@
 #include "scores.h"
 #include "config.h"
 #include "menu.h"
-//#include "levels.h"
+#include "letters.h"
 #include "vector.h"
 #include "resources.h"
 //#include "save.h"
@@ -186,7 +186,8 @@ static void drawLivesAndScore(App* app, Ship* player)
     text_drawText(app, "a", 10 + (i*20), 50, (SDL_Color){255,255,255,255}, 0, fnTitle);
 	text_drawText(app, score, 10, 10, (SDL_Color){255,255,255,255}, 0, fnTitle);
 
-	text_drawText(app, "DISASTEROIDS!", 0, 10, (SDL_Color){255,255,255,255}, TEXT_CENTRED, fnTitle);
+	//text_drawText(app, "DISASTEROIDS!", 0, 10, (SDL_Color){255,255,255,255}, TEXT_CENTRED, fnTitle);
+	letters_drawSentence(app->renderer, "DISASTEROIDS\0", 5, 100, 10);
 
 }
 /*
@@ -984,6 +985,8 @@ int main(int argc, char** argv)
         {
           printf("Level complete\n");
         }
+				letters_drawSentence(app.renderer, "ABCDEFGHIJKLMNOPQRSTUVWXYZ\0", 5, 100, 100);
+				letters_drawSentence(app.renderer, "abcdefghijklmn", 5, 100, 150);
         //SDL_Delay(200);
 			}
 //        currentlywarping = bat_movebat(&player, arena.bounds);
