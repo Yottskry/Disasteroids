@@ -21,7 +21,8 @@ asteroids_SOURCES = src/asteroids.c src/app.h \
 		src/resources.c src/resources.h \
 		src/ship.c src/ship.h \
 		src/sparkle.h \
-		src/rock.c src/rock.h
+		src/rock.c src/rock.h \
+		src/letters.c src/letters.h
 # Additional platform-independent data files
 FONTS = 	Fonts/Nordine.ttf \
 		Fonts/Vectroid.otf \
@@ -69,62 +70,10 @@ SOUNDS = 	Sounds/barkanoid-1up.wav \
 		Sounds/barkanoid-meow.wav \
 		Sounds/barkanoid-ow.wav \
 		Sounds/barkanoid-wallbounce.wav
-SPRITES = 	Sprites/ball-deadly.png \
-		Sprites/ball.png \
-		Sprites/barkout-intro.png \
-		Sprites/bat_grow.png \
-		Sprites/bat_laserify.png \
-		Sprites/bat_laser.png \
-		Sprites/bat_long.png \
-		Sprites/bat.png \
-		Sprites/bat_shrink.png \
-		Sprites/bat_small.png \
-		Sprites/bg1_fg.png \
-		Sprites/bg1_mg.png \
-		Sprites/bg1.png \
-		Sprites/bg2_fg.png \
-		Sprites/bg2_mg.png \
-		Sprites/bg2.png \
-		Sprites/bg3_fg.png \
-		Sprites/bg3_mg.png \
-		Sprites/bg3.png \
-		Sprites/bg4.png \
-		Sprites/blue.png \
-		Sprites/bonus-c.png \
-		Sprites/bonus-e.png \
-		Sprites/bonus-l.png \
-		Sprites/bonus.png \
-		Sprites/bonus-p.png \
-		Sprites/bonus-s.png \
-		Sprites/bonus-w.png \
-		Sprites/bonus-m.png \
-		Sprites/border.png \
-		Sprites/boss.png \
-		Sprites/cat-die.png \
-		Sprites/cat.png \
-		Sprites/cat-spawn.png \
-		Sprites/darkgrey.png \
-		Sprites/green_bottom.png \
-		Sprites/green.png \
-		Sprites/grey_broken.png \
-		Sprites/grey.png \
-		Sprites/grey_repair.png \
-		Sprites/life.png \
-		Sprites/orange.png \
-		Sprites/purple.png \
-		Sprites/red.png \
-		Sprites/scores.png \
-		Sprites/warp.png \
-		Sprites/white.png \
-		Sprites/white_top.png \
-		Sprites/wormhole2.png \
-		Sprites/wormhole.png \
-		Sprites/yellow.png \
-		Sprites/FatHorseGames.png \
-		Sprites/switch.png
+Sprites =	Sprites/FatHorseGames.png 
 
 # nobase tells it to include the prefixing directory names in the destination (i.e. not just dump the files into the single data folder)
-nobase_dist_pkgdata_DATA = $(FONTS) $(SOUNDS) $(SPRITES) Levels/levels.dat
+nobase_dist_pkgdata_DATA = $(FONTS) $(SOUNDS) $(SPRITES)
 
 # Flags passed to the C Preprocessor; in this case the install directory
 # The game tests if an installed file exists and then sets a variable (see config.c)
